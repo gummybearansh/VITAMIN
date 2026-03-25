@@ -14,7 +14,7 @@ import HomeScreen from './screens/HomeScreen';
 import GoalsScreen from './screens/GoalsScreen';
 import EventsScreen from './screens/EventsScreen';
 import BuddyScreen from './screens/BuddyScreen';
-import ChatScreen from './screens/ChatScreen';
+import VTOPSyncScreen from './screens/VTOPSyncScreen';
 
 // Import Context
 import { AppProvider, AppContext } from './context/AppContext';
@@ -43,7 +43,10 @@ function MainNavigator() {
       {!currentUser ? (
         <Stack.Screen name="Login" component={LoginScreen} />
       ) : (
-        <Stack.Screen name="Main" component={MainLayout} />
+        <>
+           <Stack.Screen name="Main" component={MainLayout} />
+           <Stack.Screen name="VTOPSync" component={VTOPSyncScreen} options={{ presentation: 'modal' }} />
+        </>
       )}
     </Stack.Navigator>
   );

@@ -2,15 +2,16 @@ import React, { useContext } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { styled } from 'nativewind';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { AppContext } from '../context/AppContext'; // <--- NEW IMPORT
-import { MapPin, ArrowUpRight } from 'lucide-react-native';
+import { MapPin, ArrowUpRight, RefreshCw } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
 
 export default function HomeScreen() {
   const { currentUser } = useContext(AppContext);
-  const currentClass = currentUser.schedule.find(c => c.status === "Live") || currentUser.schedule[0];
+  const navigation = useNavigation();
+  const currentClass = currentUser.schedule.find(c => c.status === "Live") || currentUser.schedule[0] || { status: 'Free', title: 'No Classes', time: '--:--', loc: '--', type: '--' };
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -40,6 +41,13 @@ export default function HomeScreen() {
         <TouchableOpacity className="bg-black h-14 w-full rounded-2xl items-center justify-center flex-row shadow-lg">
            <StyledText className="text-white font-bold text-lg mr-2">Check Materials</StyledText>
            <ArrowUpRight color="white" size={20} />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+           onPress={() => navigation.navigate('VTOPSync')}
+           className="bg-primary/10 h-14 w-full rounded-2xl items-center justify-center flex-row mt-4">
+           <RefreshCw color="#6366f1" size={20} className="mr-2" />
+           <StyledText className="text-primary font-bold text-lg">Sync VTOP Timetable</StyledText>
         </TouchableOpacity>
       </Animated.View>
 

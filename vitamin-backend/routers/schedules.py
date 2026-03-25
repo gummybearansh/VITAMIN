@@ -4,6 +4,11 @@ from typing import List
 import models, schemas
 from database import get_db
 from routers.auth import get_current_user
+from services.vtop_scraper import scrape_vtop_data
+from pydantic import BaseModel
+
+class SyncRequest(BaseModel):
+    cookies: str
 
 router = APIRouter(
     prefix="/schedules",
@@ -17,6 +22,15 @@ def create_schedule(schedule: schemas.ScheduleCreate, db: Session = Depends(get_
     db.commit()
     db.refresh(new_schedule)
     return new_schedule
+
+@router.post("/sync-vtop")
+async def sync_vtop(req: SyncRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Run the VTOP asynchronous scraper
+    try:
+        result = await scrape_vtop_data(req.cookies, current_user.registration_number)
+        return {"message": "Sync triggered successfully", "details": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_model=List[schemas.Schedule])
 def get_schedules(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
