@@ -27,12 +27,14 @@ export default function LoginScreen() {
             <>
                <TextInput 
                  className="bg-white p-4 rounded-2xl border border-gray-200 mb-4 text-lg"
-                 placeholder="Full Name" 
+                 placeholder="Full Name"
+                 placeholderTextColor="#9ca3af" 
                  value={name} onChangeText={setName}
                />
                <TextInput 
                  className="bg-white p-4 rounded-2xl border border-gray-200 mb-4 text-lg"
                  placeholder="Branch (e.g. CSE)" 
+                 placeholderTextColor="#9ca3af"
                  value={branch} onChangeText={setBranch}
                />
             </>
@@ -41,11 +43,13 @@ export default function LoginScreen() {
          <TextInput 
            className="bg-white p-4 rounded-2xl border border-gray-200 mb-4 text-lg"
            placeholder="Reg Number (e.g. 23BAI10120)" 
+           placeholderTextColor="#9ca3af"
            value={username} onChangeText={setUsername} autoCapitalize="none"
          />
          <TextInput 
            className="bg-white p-4 rounded-2xl border border-gray-200 mb-6 text-lg"
            placeholder="Password" 
+           placeholderTextColor="#9ca3af"
            secureTextEntry
            value={password} onChangeText={setPassword}
          />

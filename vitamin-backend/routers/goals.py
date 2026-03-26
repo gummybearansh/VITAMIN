@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from typing import List
 import models, schemas
-from database import get_db
+from beanie import PydanticObjectId
 from routers.auth import get_current_user
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/goals",
@@ -11,35 +13,46 @@ router = APIRouter(
 )
 
 @router.post("/", response_model=schemas.Goal)
-def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    new_goal = models.Goal(**goal.dict(), owner_id=current_user.id)
-    db.add(new_goal)
-    db.commit()
-    db.refresh(new_goal)
+async def create_goal(goal: schemas.GoalCreate, current_user: models.User = Depends(get_current_user)):
+    logger.info(f"Creating a new goal for user {current_user.registration_number}")
+    new_goal = models.Goal(**goal.dict(), owner_id=current_user.registration_number)
+    await new_goal.insert()
     return new_goal
 
 @router.get("/", response_model=List[schemas.Goal])
-def get_goals(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return db.query(models.Goal).filter(models.Goal.owner_id == current_user.id).all()
+async def get_goals(current_user: models.User = Depends(get_current_user)):
+    logger.info(f"Fetching goals for user {current_user.registration_number}")
+    return await models.Goal.find({"owner_id": current_user.registration_number}).to_list()
 
 @router.delete("/{goal_id}")
-def delete_goal(goal_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    goal = db.query(models.Goal).filter(models.Goal.id == goal_id, models.Goal.owner_id == current_user.id).first()
-    if not goal:
+async def delete_goal(goal_id: str, current_user: models.User = Depends(get_current_user)):
+    try:
+        obj_id = PydanticObjectId(goal_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid goal ID format")
+    
+    goal = await models.Goal.get(obj_id)
+    if not goal or goal.owner_id != current_user.registration_number:
+        logger.warning(f"Goal {goal_id} not found or unauthorized for delete by {current_user.registration_number}")
         raise HTTPException(status_code=404, detail="Goal not found")
-    db.delete(goal)
-    db.commit()
+    
+    await goal.delete()
     return {"message": "Goal deleted successfully"}
 
 @router.put("/{goal_id}", response_model=schemas.Goal)
-def update_goal(goal_id: int, goal_update: schemas.GoalCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    goal = db.query(models.Goal).filter(models.Goal.id == goal_id, models.Goal.owner_id == current_user.id).first()
-    if not goal:
+async def update_goal(goal_id: str, goal_update: schemas.GoalCreate, current_user: models.User = Depends(get_current_user)):
+    try:
+        obj_id = PydanticObjectId(goal_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid goal ID format")
+        
+    goal = await models.Goal.get(obj_id)
+    if not goal or goal.owner_id != current_user.registration_number:
+        logger.warning(f"Goal {goal_id} not found or unauthorized for update by {current_user.registration_number}")
         raise HTTPException(status_code=404, detail="Goal not found")
     
     for key, value in goal_update.dict().items():
         setattr(goal, key, value)
     
-    db.commit()
-    db.refresh(goal)
+    await goal.save()
     return goal

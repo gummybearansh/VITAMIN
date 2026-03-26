@@ -4,6 +4,7 @@ import { styled } from 'nativewind';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MapPin, ArrowUpRight, RefreshCw } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import { AppContext } from '../context/AppContext';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);

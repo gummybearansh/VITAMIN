@@ -1,23 +1,25 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
+from beanie import PydanticObjectId
 
 # --- Schedule Schemas ---
 class ScheduleBase(BaseModel):
     time: str
     title: str
     loc: str
-    type: str
-    status: str
+    type: str # Theory, Lab, Chill
+    status: str # Done, Live, Upcoming
 
 class ScheduleCreate(ScheduleBase):
     pass
 
 class Schedule(ScheduleBase):
-    id: int
-    owner_id: int
+    id: PydanticObjectId = Field(default_factory=PydanticObjectId, alias="_id")
+    owner_id: str
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 # --- Goal Schemas ---
 class GoalBase(BaseModel):
@@ -30,11 +32,12 @@ class GoalCreate(GoalBase):
     pass
 
 class Goal(GoalBase):
-    id: int
-    owner_id: int
+    id: PydanticObjectId = Field(default_factory=PydanticObjectId, alias="_id")
+    owner_id: str
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 # --- User Auth & Profile Schemas ---
 class UserBase(BaseModel):
@@ -54,7 +57,7 @@ class Token(BaseModel):
     token_type: str
 
 class UserProfile(UserBase):
-    id: int
+    id: PydanticObjectId = Field(default_factory=PydanticObjectId, alias="_id")
     cgpa: float
     attendance: float
     goals: List[Goal] = []
@@ -62,3 +65,4 @@ class UserProfile(UserBase):
 
     class Config:
         from_attributes = True
+        populate_by_name = True

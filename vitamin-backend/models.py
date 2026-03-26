@@ -1,42 +1,38 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean
-from sqlalchemy.orm import relationship
-from database import Base
+from beanie import Document
+from pydantic import Field
+from typing import Optional
 
-class User(Base):
-    __tablename__ = "users"
+class User(Document):
+    registration_number: str
+    name: str
+    branch: str
+    cgpa: float = 0.0
+    attendance: float = 0.0
+    hashed_password: str
 
-    id = Column(Integer, primary_key=True, index=True)
-    registration_number = Column(String, unique=True, index=True)
-    name = Column(String)
-    branch = Column(String)
-    cgpa = Column(Float, default=0.0)
-    attendance = Column(Float, default=0.0)
-    hashed_password = Column(String)
+    class Settings:
+        name = "users"
+        indexes = [
+            "registration_number"
+        ]
 
-    goals = relationship("Goal", back_populates="owner")
-    schedule = relationship("Schedule", back_populates="owner")
+class Goal(Document):
+    title: str
+    category: str
+    progress: float = 0.0
+    streak: int = 0
+    owner_id: str
 
-class Goal(Base):
-    __tablename__ = "goals"
+    class Settings:
+        name = "goals"
 
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)
-    category = Column(String) # Academic, Personal, Career, Financial
-    progress = Column(Float, default=0.0)
-    streak = Column(Integer, default=0)
-    owner_id = Column(Integer, ForeignKey("users.id"))
-    
-    owner = relationship("User", back_populates="goals")
+class Schedule(Document):
+    time: str
+    title: str
+    loc: str
+    type: str # Theory, Lab, Chill
+    status: str # Done, Live, Upcoming
+    owner_id: str
 
-class Schedule(Base):
-    __tablename__ = "schedules"
-
-    id = Column(Integer, primary_key=True, index=True)
-    time = Column(String) # e.g., "08:30"
-    title = Column(String)
-    loc = Column(String)
-    type = Column(String) # Theory, Lab, Chill
-    status = Column(String) # Done, Live, Upcoming
-    owner_id = Column(Integer, ForeignKey("users.id"))
-
-    owner = relationship("User", back_populates="schedule")
+    class Settings:
+        name = "schedules"

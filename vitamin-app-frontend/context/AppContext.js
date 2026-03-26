@@ -198,7 +198,7 @@ export const AppProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(null);
 
   // We are using your machine's local IP address so your phone (Expo Go) can reach it!
-  const API_URL = "http://172.25.225.213:8000";
+  const API_URL = "http://172.20.10.3:8000";
 
   const fetchUserProfile = async (token) => {
     try {
