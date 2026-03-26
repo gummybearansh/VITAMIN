@@ -8,6 +8,7 @@ class User(Document):
     branch: str
     cgpa: float = 0.0
     attendance: float = 0.0
+    current_semester: str = ""
     hashed_password: str
 
     class Settings:
@@ -32,6 +33,7 @@ class Schedule(Document):
     loc: str
     type: str # Theory, Lab, Chill
     status: str # Done, Live, Upcoming
+    semester: str
     owner_id: str
 
     class Settings:

@@ -35,22 +35,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 @router.post("/register", response_model=schemas.Token)
 async def register(user: schemas.UserCreate):
-    logger.info(f"Attempting to register user: {user.registration_number}")
-    db_user = await models.User.find_one({"registration_number": user.registration_number})
+    reg_number = user.registration_number.upper()
+    logger.info(f"Attempting to register user: {reg_number}")
+    db_user = await models.User.find_one({"registration_number": reg_number})
     if db_user:
-        logger.warning(f"Registration failed: Registration number {user.registration_number} already registered")
+        logger.warning(f"Registration failed: Registration number {reg_number} already registered")
         raise HTTPException(status_code=400, detail="Registration number already registered")
     
     hashed_password = auth_utils.get_password_hash(user.password)
     
     new_user = models.User(
-        registration_number=user.registration_number,
+        registration_number=reg_number,
         name=user.name,
         branch=user.branch,
         hashed_password=hashed_password
     )
     await new_user.insert()
-    logger.info(f"User {user.registration_number} registered successfully.")
+    logger.info(f"User {reg_number} registered successfully.")
 
     access_token = auth_utils.create_access_token(
         data={"sub": new_user.registration_number}
@@ -59,17 +60,18 @@ async def register(user: schemas.UserCreate):
 
 @router.post("/login", response_model=schemas.Token)
 async def login(user: schemas.UserLogin):
-    logger.info(f"Login attempt for user: {user.registration_number}")
-    db_user = await models.User.find_one({"registration_number": user.registration_number})
+    reg_number = user.registration_number.upper()
+    logger.info(f"Login attempt for user: {reg_number}")
+    db_user = await models.User.find_one({"registration_number": reg_number})
     if not db_user:
-        logger.warning(f"Login failed: Invalid registration number {user.registration_number}")
+        logger.warning(f"Login failed: Invalid registration number {reg_number}")
         raise HTTPException(status_code=400, detail="Invalid registration number")
     
     if not auth_utils.verify_password(user.password, db_user.hashed_password):
-        logger.warning(f"Login failed: Invalid password for {user.registration_number}")
+        logger.warning(f"Login failed: Invalid password for {reg_number}")
         raise HTTPException(status_code=400, detail="Invalid password")
     
-    logger.info(f"User {user.registration_number} logged in successfully.")
+    logger.info(f"User {reg_number} logged in successfully.")
     access_token = auth_utils.create_access_token(
         data={"sub": db_user.registration_number}
     )

@@ -261,7 +261,7 @@ export const AppProvider = ({ children }) => {
   };
 
   return (
-    <AppContext.Provider value={{ currentUser, authToken, allUsers, setAllUsers, login, register, logout }}>
+    <AppContext.Provider value={{ currentUser, authToken, allUsers, setAllUsers, login, register, logout, API_URL, fetchUserProfile }}>
       {children}
     </AppContext.Provider>
   );

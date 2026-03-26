@@ -9,6 +9,7 @@ class ScheduleBase(BaseModel):
     loc: str
     type: str # Theory, Lab, Chill
     status: str # Done, Live, Upcoming
+    semester: str
 
 class ScheduleCreate(ScheduleBase):
     pass
@@ -60,6 +61,7 @@ class UserProfile(UserBase):
     id: PydanticObjectId = Field(default_factory=PydanticObjectId, alias="_id")
     cgpa: float
     attendance: float
+    current_semester: str = ""
     goals: List[Goal] = []
     schedule: List[Schedule] = []
 

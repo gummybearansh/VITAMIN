@@ -5,12 +5,13 @@ from beanie import PydanticObjectId
 from routers.auth import get_current_user
 from services.vtop_scraper import scrape_vtop_data
 from pydantic import BaseModel
+from typing import Any, Dict
 import logging
 
 logger = logging.getLogger(__name__)
 
 class SyncRequest(BaseModel):
-    cookies: str
+    payload: Dict[str, Any]
 
 router = APIRouter(
     prefix="/schedules",
@@ -29,7 +30,7 @@ async def sync_vtop(req: SyncRequest, current_user: models.User = Depends(get_cu
     logger.info(f"Sync triggered for {current_user.registration_number}")
     # Run the VTOP asynchronous scraper
     try:
-        result = await scrape_vtop_data(req.cookies, current_user.registration_number)
+        result = await scrape_vtop_data(req.payload, current_user)
         return {"message": "Sync triggered successfully", "details": result}
     except Exception as e:
         logger.error(f"Sync error for {current_user.registration_number}: {e}")

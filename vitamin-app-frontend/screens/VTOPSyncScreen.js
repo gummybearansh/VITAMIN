@@ -2,7 +2,7 @@ import React, { useState, useRef, useContext } from 'react';
 import { View, Text, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { AppContext } from '../context/AppContext';
-import { X, CheckCircle } from 'lucide-react-native';
+import { X, CheckCircle, RefreshCw } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 
 export default function VTOPSyncScreen() {
@@ -13,28 +13,133 @@ export default function VTOPSyncScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState(false);
 
-  // This JS runs inside the WebView on every page load
-  // It checks if the URL is the dashboard/main page, meaning login succeeded.
-  const injectJS = `
-    (function() {
-       if (window.location.href.includes('/vtop/main/page') || window.location.href.includes('dashboard')) {
-           window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'LOGIN_SUCCESS',
-              cookies: document.cookie
-           }));
+  const handleNavigationStateChange = (navState) => {
+    console.log("VTOP WebView Navigated to:", navState.url);
+    if (navState.url.includes('/vtop/content')) {
+       const grabHtmlJS = `
+          (async function scrapeVTOP() {
+              if (document.getElementById('vtopLoginForm')) return;
+              if (window.location.href.indexOf('/vtop/content') === -1) return;
+              
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SCRAPE_START' }));
+              
+              try {
+                  // VTOP STRICTLY validates registration numbers with uppercase!
+                  const regNo = "${currentUser.registration_number}".toUpperCase();
+                  
+                  // In VTOP, csrf might also be tracked in meta tags or specific hidden fields
+                  let csrf = document.querySelector('input[name="_csrf"]')?.value || '';
+                  if (!csrf) csrf = document.querySelector('meta[name="_csrf"]')?.content || '';
+                  // Also look inside all forms
+                  if (!csrf) {
+                      const forms = document.querySelectorAll('form');
+                      for (let f of forms) {
+                          const input = f.querySelector('input[name="_csrf"]');
+                          if (input) { csrf = input.value; break; }
+                      }
+                  }
+                  
+                  const payload = { timetables: {}, attendance: {} };
+                  
+                  // 1. Fetch Semesters from TimeTable Dashboard
+                  const ttInitRes = await fetch('https://vtop.vitbhopal.ac.in/vtop/academics/common/StudentTimeTable', {
+                      method: 'POST',
+                      headers: {
+                          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                          'X-Requested-With': 'XMLHttpRequest'
+                      },
+                      body: 'verifyMenu=true&authorizedID=' + encodeURIComponent(regNo) + '&_csrf=' + encodeURIComponent(csrf) + '&nocache=@(' + new Date().getTime() + ')'
+                  });
+                  const ttHtml = await ttInitRes.text();
+                  
+                  const semesters = [];
+                  const selectRegex = /<select.*?id="semesterSubId".*?>(.*?)<\\/select>/s;
+                  const selectMatch = ttHtml.match(selectRegex);
+                  if (selectMatch) {
+                      const optionsRegex = /<option value="([^"]+)">(.*?)<\\/option>/g;
+                      let optionMatch;
+                      while ((optionMatch = optionsRegex.exec(selectMatch[1])) !== null) {
+                          if (optionMatch[1]) semesters.push(optionMatch[1]);
+                      }
+                  }
+
+                  // 2. Fetch Timetable for each semester
+                  for (let sem of semesters) {
+                      const bodyTT = '_csrf=' + encodeURIComponent(csrf) + 
+                                   '&semesterSubId=' + encodeURIComponent(sem) + 
+                                   '&authorizedID=' + encodeURIComponent(regNo) + 
+                                   '&x=' + encodeURIComponent(new Date().toUTCString());
+                      const resTT = await fetch('https://vtop.vitbhopal.ac.in/vtop/processViewTimeTable', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                          body: bodyTT
+                      });
+                      payload.timetables[sem] = await resTT.text();
+                  }
+
+                  // 3. Fetch Attendance Dashboard to initialize container
+                  await fetch('https://vtop.vitbhopal.ac.in/vtop/examinations/StudentAttendance', {
+                      method: 'POST',
+                      headers: {
+                          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                          'X-Requested-With': 'XMLHttpRequest'
+                      },
+                      body: 'verifyMenu=true&authorizedID=' + encodeURIComponent(regNo) + '&_csrf=' + encodeURIComponent(csrf) + '&nocache=@(' + new Date().getTime() + ')'
+                  });
+                  
+                  // 4. Fetch Attendance for each semester
+                  for (let sem of semesters) {
+                      const bodyAtt = '_csrf=' + encodeURIComponent(csrf) + 
+                                   '&semesterSubId=' + encodeURIComponent(sem) + 
+                                   '&authorizedID=' + encodeURIComponent(regNo) + 
+                                   '&x=' + encodeURIComponent(new Date().toUTCString());
+                      const resAtt = await fetch('https://vtop.vitbhopal.ac.in/vtop/processViewStudentAttendance', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                          body: bodyAtt
+                      });
+                      payload.attendance[sem] = await resAtt.text();
+                  }
+
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'LOGIN_SUCCESS',
+                      payload: payload
+                  }));
+              } catch (err) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'LOGIN_SUCCESS',
+                      error: err.message
+                  }));
+              }
+          })();
+          true;
+       `;
+       if (webviewRef.current && !isSyncing && !syncSuccess) {
+          webviewRef.current.injectJavaScript(grabHtmlJS);
        }
-    })();
-    true;
-  `;
+    }
+  };
 
   const handleMessage = async (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+      
+      if (data.type === 'SCRAPE_START') {
+          setIsSyncing(true);
+          return;
+      }
+      
       if (data.type === 'LOGIN_SUCCESS') {
+         if (data.error) {
+             Alert.alert("Sync Error", data.error);
+             setIsSyncing(false);
+             return;
+         }
          setIsSyncing(true);
          
-         // Send the captured cookies to our FastAPI backend to trigger the scraping Phase!
-         console.log("Captured VTOP Cookies:", data.cookies);
+         const payload = data.payload;
+         const numTT = Object.keys(payload.timetables || {}).length;
+         console.log(`VTOP Scraping Done! Sending ${numTT} semesters of scraped XML back to server.`);
          
          const res = await fetch(`${API_URL}/schedules/sync-vtop`, {
             method: 'POST',
@@ -42,21 +147,21 @@ export default function VTOPSyncScreen() {
                'Content-Type': 'application/json',
                'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({
-               cookies: data.cookies
-            })
+            body: JSON.stringify({ payload: payload })
          });
          
          if (res.ok) {
             setSyncSuccess(true);
-            setTimeout(() => navigation.navigate('Main'), 2000);
+            setTimeout(() => { if (navigation.canGoBack()) navigation.goBack() }, 2000);
          } else {
             Alert.alert("Sync Failed", "Could not synchronize VTOP data with the backend.");
             setIsSyncing(false);
          }
       }
     } catch (e) {
-      console.log('Error parsing WebView message:', e);
+      console.log('Error parsing WebView message or executing POST:', e);
+      setIsSyncing(false);
+      Alert.alert("Sync Timed Out", "The synchronization request failed. Please ensure the backend is running and reachable.");
     }
   };
 
@@ -78,33 +183,48 @@ export default function VTOPSyncScreen() {
             <Text className="text-xl font-bold text-black">VTOP Login</Text>
             <Text className="text-xs text-textLight">Please login to sync your classes.</Text>
          </View>
-         <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-bg rounded-full border border-border">
-            <X size={20} color="black" />
-         </TouchableOpacity>
+         <View className="flex-row">
+            {!isSyncing && (
+               <TouchableOpacity onPress={() => webviewRef.current?.reload()} className="p-2 bg-bg rounded-full border border-border mr-2">
+                  <RefreshCw size={20} color="black" />
+               </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-bg rounded-full border border-border">
+               <X size={20} color="black" />
+            </TouchableOpacity>
+         </View>
       </View>
 
       {/* WebView */}
-      {!isSyncing ? (
+      <View className="flex-1 bg-bg relative">
          <WebView
             ref={webviewRef}
-            source={{ uri: 'https://vtop.vitbhopal.ac.in/vtop/open' }}
+            source={{ uri: 'https://vtop.vitbhopal.ac.in/vtop/open/login' }}
             sharedCookiesEnabled={true}
-            injectedJavaScript={injectJS}
+            onShouldStartLoadWithRequest={(req) => {
+               if (req.url === 'about:srcdoc') return false;
+               return true;
+            }}
+            onError={(e) => {
+               if (e.nativeEvent.url === 'about:srcdoc') return;
+            }}
+            onNavigationStateChange={handleNavigationStateChange}
             onMessage={handleMessage}
             startInLoadingState={true}
             renderLoading={() => (
-               <View className="absolute inset-0 items-center justify-center bg-bg opacity-80">
+               <View className="absolute inset-0 items-center justify-center bg-bg opacity-80 z-40">
                   <ActivityIndicator size="large" color="#000" />
                </View>
             )}
          />
-      ) : (
-         <View className="flex-1 bg-bg items-center justify-center p-6">
-            <ActivityIndicator size="large" color="#000" className="mb-6" />
-            <Text className="text-xl font-bold text-black text-center mb-2">Syncing Data...</Text>
-            <Text className="text-textLight text-center">Scraping classes and attendance from VTOP. Please wait.</Text>
-         </View>
-      )}
+         {isSyncing && (
+            <View className="absolute inset-0 bg-bg items-center justify-center p-6 z-50">
+               <ActivityIndicator size="large" color="#000" className="mb-6" />
+               <Text className="text-xl font-bold text-black text-center mb-2">Syncing Data...</Text>
+               <Text className="text-textLight text-center">Scraping classes and attendance from VTOP. Please wait.</Text>
+            </View>
+         )}
+      </View>
     </View>
   );
 }

@@ -44,7 +44,7 @@ export default function LoginScreen() {
            className="bg-white p-4 rounded-2xl border border-gray-200 mb-4 text-lg"
            placeholder="Reg Number (e.g. 23BAI10120)" 
            placeholderTextColor="#9ca3af"
-           value={username} onChangeText={setUsername} autoCapitalize="none"
+           value={username} onChangeText={(text) => setUsername(text.toUpperCase())} autoCapitalize="characters"
          />
          <TextInput 
            className="bg-white p-4 rounded-2xl border border-gray-200 mb-6 text-lg"
